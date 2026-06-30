@@ -4,15 +4,13 @@ window.addEventListener("load", async () => {
 
     if (!token) return;
 
-    const res = await fetch(`/verify/${token}`);
+    const res = await fetch(`/me/${token}`);
     const data = await res.json();
 
     if (data.valid) {
-        localStorage.setItem("username", data.username);
         window.location.href = "/chat?user=" + data.username;
     } else {
-        localStorage.removeItem("token");
-        localStorage.removeItem("username");
+        localStorage.clear();
     }
 });
 
@@ -31,9 +29,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const res = await fetch("/login", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ username, password })
         });
 
@@ -45,7 +41,6 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         localStorage.setItem("token", data.token);
-        localStorage.setItem("username", username);
 
         window.location.href = "/chat?user=" + username;
     });

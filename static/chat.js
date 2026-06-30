@@ -1,26 +1,39 @@
-const currentUser = new URLSearchParams(window.location.search).get("user");
-
-if (!currentUser) {
-    window.location.href = "/";
-}
-
+let currentUser = null;
 let selectedUser = null;
-// =====================
-// GET USER FROM URL (?user=)
-// =====================
-function getUserFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("user");
-}
-
-// init selected user ONCE
-selectedUser = getUserFromURL();
-
-console.log("CURRENT USER =", currentUser);
-console.log("CHAT WITH =", selectedUser);
 
 // =====================
-// LOAD USERS (SIDEBAR)
+// INIT SAFE AUTH
+// =====================
+window.addEventListener("load", async () => {
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+        window.location.href = "/";
+        return;
+    }
+
+    const res = await fetch(`/me/${token}`);
+    const data = await res.json();
+
+    if (!data.valid) {
+        localStorage.clear();
+        window.location.href = "/";
+        return;
+    }
+
+    currentUser = data.username;
+
+    selectedUser = new URLSearchParams(window.location.search).get("user");
+
+    loadUsers();
+    loadMessages();
+
+    setInterval(loadMessages, 3000);
+});
+
+// =====================
+// USERS
 // =====================
 async function loadUsers() {
 
@@ -32,23 +45,18 @@ async function loadUsers() {
 
     users.forEach(u => {
 
-        const username = u.username || u;
+        const username = u.username;
 
         const div = document.createElement("div");
         div.innerText = username;
 
-        // highlight current chat user
         if (username === selectedUser) {
             div.style.fontWeight = "bold";
         }
 
         div.onclick = () => {
-
-            // change ONLY URL (no reload loop)
-            window.history.pushState({}, "", `/chat?user=${username}`);
-
             selectedUser = username;
-
+            history.pushState({}, "", `/chat?user=${username}`);
             loadMessages();
         };
 
@@ -57,11 +65,11 @@ async function loadUsers() {
 }
 
 // =====================
-// LOAD MESSAGES
+// MESSAGES
 // =====================
 async function loadMessages() {
 
-    if (!selectedUser || !currentUser) return;
+    if (!currentUser || !selectedUser) return;
 
     const res = await fetch("/messages");
     const data = await res.json();
@@ -79,12 +87,10 @@ async function loadMessages() {
             const div = document.createElement("div");
             div.classList.add("msg");
 
-            if (m.from === currentUser) {
-                div.classList.add("me");
-            }
+            if (m.from === currentUser) div.classList.add("me");
 
             div.innerHTML = `
-                <div class="username">${m.from ?? "unknown"}</div>
+                <div class="username">${m.from}</div>
                 <div class="text">${m.text}</div>
             `;
 
@@ -104,9 +110,7 @@ async function sendMessage() {
 
     await fetch("/send_message", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             from: currentUser,
             to: selectedUser,
@@ -115,19 +119,15 @@ async function sendMessage() {
     });
 
     input.value = "";
-
     loadMessages();
 }
 
 // =====================
-// INIT (NO LOOP)
+// THEME
 // =====================
-window.onload = () => {
+function changeTheme() {
 
-    loadUsers();
-    loadMessages();
-
-    setInterval(() => {
-        loadMessages();
-    }, 3000);
-};
+    const theme = document.getElementById("themeSelect").value;
+    localStorage.setItem("theme", theme);
+    document.body.className = theme;
+}

@@ -9,7 +9,7 @@ import string
 
 app = FastAPI()
 
-# CORS (utile pour fetch JS)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,14 +17,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# STATIC FILES
+# STATIC
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# --------------------
+# MEMORY STORE (DEV ONLY)
+# --------------------
+TOKENS = {}
+
+def generate_token():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+
 
 # --------------------
-# FRONTEND PAGES
+# PAGES
 # --------------------
-
 @app.get("/")
 def index():
     return FileResponse("index.html")
@@ -38,7 +45,6 @@ def chat():
 # --------------------
 # USERS
 # --------------------
-
 @app.get("/users")
 def users():
     with open("data/users.json", "r", encoding="utf-8") as f:
@@ -48,7 +54,6 @@ def users():
 # --------------------
 # MESSAGES
 # --------------------
-
 @app.get("/messages")
 def get_messages():
     with open("data/messages.json", "r", encoding="utf-8") as f:
@@ -74,15 +79,8 @@ def send_message(data: dict):
 
 
 # --------------------
-# AUTH SIMPLE TOKEN SYSTEM
+# AUTH
 # --------------------
-
-TOKENS = {}
-
-def generate_token():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-
-
 @app.post("/login")
 def login(data: dict):
 
@@ -97,22 +95,25 @@ def login(data: dict):
 
             return {
                 "success": True,
-                "token": token,
-                "username": u["username"]
+                "token": token
             }
 
     return {"success": False}
 
 
-@app.get("/verify/{token}")
-def verify(token: str):
+@app.get("/me/{token}")
+def me(token: str):
+    username = TOKENS.get(token)
 
-    if token not in TOKENS:
-        return {
-            "valid": False
-        }
+    if not username:
+        return {"valid": False}
 
     return {
         "valid": True,
-        "username": TOKENS[token]
+        "username": username
     }
+
+
+@app.get("/verify/{token}")
+def verify(token: str):
+    return {"valid": token in TOKENS}
