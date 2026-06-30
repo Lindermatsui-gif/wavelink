@@ -1,0 +1,17 @@
+[
+    {
+        "from": "Constant",
+        "to": "Yann",
+        "text": "salut c constant"
+    },
+    {
+        "from": "Yann",
+        "to": "Constant",
+        "text": "yo c yann"
+    },
+    {
+        "from": "Leo",
+        "to": "Yann",
+        "text": "coucou"
+    }
+]
