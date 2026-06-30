@@ -1,6 +1,25 @@
 let currentUser = null;
 let selectedUser = null;
 
+// =====================
+// UPLOAD FILE
+// =====================
+async function uploadFile(file) {
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+    });
+
+    return await res.json();
+}
+
+// =====================
+// INIT AUTH
+// =====================
 window.addEventListener("load", async () => {
 
     const token = localStorage.getItem("token");
@@ -19,14 +38,11 @@ window.addEventListener("load", async () => {
         return;
     }
 
-    // 💥 TOI = TOUJOURS BACKEND
     currentUser = data.username;
     localStorage.setItem("username", currentUser);
 
-    // 💥 CHAT TARGET = URL UNIQUEMENT
     const urlUser = new URLSearchParams(window.location.search).get("user");
 
-    // ❌ sécurité anti auto-chat
     if (urlUser === currentUser) {
         selectedUser = null;
         window.history.replaceState({}, "", "/chat");
@@ -61,17 +77,11 @@ async function loadUsers() {
         const div = document.createElement("div");
         div.innerText = username;
 
-        // =====================
-        // TOI (CURRENT USER)
-        // =====================
         if (username === currentUser) {
             div.style.opacity = "0.5";
             div.innerText += " (vous)";
         }
 
-        // =====================
-        // CHAT ACTIF
-        // =====================
         if (selectedUser && username === selectedUser) {
             div.style.fontWeight = "bold";
             div.style.color = "#4f8cff";
@@ -79,19 +89,14 @@ async function loadUsers() {
 
         div.onclick = () => {
 
-            // interdit de se sélectionner soi-même
             if (username === currentUser) return;
 
             selectedUser = username;
 
-            window.history.pushState(
-                {},
-                "",
-                `/chat?user=${username}`
-            );
+            window.history.pushState({}, "", `/chat?user=${username}`);
 
             loadMessages();
-            loadUsers(); // refresh UI propre
+            loadUsers();
         };
 
         sidebar.appendChild(div);
@@ -99,7 +104,7 @@ async function loadUsers() {
 }
 
 // =====================
-// MESSAGES
+// LOAD MESSAGES
 // =====================
 async function loadMessages() {
 
@@ -125,32 +130,57 @@ async function loadMessages() {
                 div.classList.add("me");
             }
 
-            div.innerHTML = `
-                <div class="username">${m.from}</div>
-                <div class="text">${m.text}</div>
-            `;
+            let html = `<div class="username">${m.from}</div>`;
 
+            switch (m.type) {
+
+                case "image":
+                case "gif":
+                    html += `<img src="${m.content}" style="max-width:250px;border-radius:10px;">`;
+                    break;
+
+                case "video":
+                    html += `
+                        <video controls style="max-width:250px;border-radius:10px;">
+                            <source src="${m.content}">
+                        </video>
+                    `;
+                    break;
+
+                case "file":
+                    html += `<a href="${m.content}" target="_blank">📎 ${m.text}</a>`;
+                    break;
+
+                default:
+                    html += `<div class="text">${m.text}</div>`;
+            }
+
+            div.innerHTML = html;
             box.appendChild(div);
         });
+
+    box.scrollTop = box.scrollHeight;
 }
 
 // =====================
 // SEND MESSAGE
 // =====================
-async function sendMessage() {
+function sendMessage() {
 
     const input = document.getElementById("msgInput");
     const text = input.value.trim();
 
     if (!text || !selectedUser) return;
 
-    await fetch("/send_message", {
+    fetch("/send_message", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
             from: currentUser,
             to: selectedUser,
-            text: text
+            type: "text",
+            text: text,
+            content: ""
         })
     });
 
@@ -159,10 +189,121 @@ async function sendMessage() {
 }
 
 // =====================
-// THEME
+// FILE MESSAGE
 // =====================
-function changeTheme() {
-    const theme = document.getElementById("themeSelect").value;
-    localStorage.setItem("theme", theme);
-    document.body.className = theme;
+async function handleFile() {
+
+    if (!selectedUser) return alert("Choisis un utilisateur");
+
+    const input = document.getElementById("fileInput");
+    const file = input.files[0];
+
+    if (!file) return;
+
+    const uploaded = await uploadFile(file);
+
+    const ext = file.name.split(".").pop().toLowerCase();
+
+    let type = "file";
+
+    if (["png","jpg","jpeg","webp","svg"].includes(ext)) type = "image";
+    else if (ext === "gif") type = "gif";
+    else if (["mp4","webm","mov"].includes(ext)) type = "video";
+
+    await fetch("/send_message", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            from: currentUser,
+            to: selectedUser,
+            type: type,
+            text: file.name,
+            content: uploaded.url
+        })
+    });
+
+    input.value = "";
+    loadMessages();
+}
+
+// =====================
+// ENTER TO SEND
+// =====================
+document.addEventListener("DOMContentLoaded", () => {
+
+    const input = document.getElementById("msgInput");
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            sendMessage();
+        }
+    });
+});
+
+// =====================
+// PASTE IMAGE (CTRL + V)
+// =====================
+document.addEventListener("paste", async (e) => {
+
+    const items = e.clipboardData.items;
+
+    for (let item of items) {
+
+        if (item.type.startsWith("image")) {
+
+            const file = item.getAsFile();
+
+            const uploaded = await uploadFile(file);
+
+            await fetch("/send_message", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    from: currentUser,
+                    to: selectedUser,
+                    type: "image",
+                    text: "image",
+                    content: uploaded.url
+                })
+            });
+
+            loadMessages();
+        }
+    }
+});
+
+// =====================
+// DRAG & DROP
+// =====================
+const inputArea = document.getElementById("inputArea");
+
+if (inputArea) {
+
+    inputArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+    });
+
+    inputArea.addEventListener("drop", async (e) => {
+
+        e.preventDefault();
+
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+
+        const uploaded = await uploadFile(file);
+
+        await fetch("/send_message", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                from: currentUser,
+                to: selectedUser,
+                type: "image",
+                text: file.name,
+                content: uploaded.url
+            })
+        });
+
+        loadMessages();
+    });
 }
