@@ -103,6 +103,7 @@ def login(data: dict):
 
 @app.get("/me/{token}")
 def me(token: str):
+
     username = TOKENS.get(token)
 
     if not username:
@@ -114,6 +115,3 @@ def me(token: str):
     }
 
 
-@app.get("/verify/{token}")
-def verify(token: str):
-    return {"valid": token in TOKENS}

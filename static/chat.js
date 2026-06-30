@@ -1,9 +1,6 @@
 let currentUser = null;
 let selectedUser = null;
 
-// =====================
-// INIT SAFE AUTH
-// =====================
 window.addEventListener("load", async () => {
 
     const token = localStorage.getItem("token");
@@ -22,14 +19,28 @@ window.addEventListener("load", async () => {
         return;
     }
 
+    // 💥 TOI = TOUJOURS BACKEND
     currentUser = data.username;
+    localStorage.setItem("username", currentUser);
 
-    selectedUser = new URLSearchParams(window.location.search).get("user");
+    // 💥 CHAT TARGET = URL UNIQUEMENT
+    const urlUser = new URLSearchParams(window.location.search).get("user");
+
+    // ❌ sécurité anti auto-chat
+    if (urlUser === currentUser) {
+        selectedUser = null;
+        window.history.replaceState({}, "", "/chat");
+    } else {
+        selectedUser = urlUser;
+    }
 
     loadUsers();
     loadMessages();
 
-    setInterval(loadMessages, 3000);
+    setInterval(loadMessages, 2000);
+
+    const theme = localStorage.getItem("theme") || "light";
+    document.body.className = theme;
 });
 
 // =====================
@@ -50,14 +61,37 @@ async function loadUsers() {
         const div = document.createElement("div");
         div.innerText = username;
 
-        if (username === selectedUser) {
+        // =====================
+        // TOI (CURRENT USER)
+        // =====================
+        if (username === currentUser) {
+            div.style.opacity = "0.5";
+            div.innerText += " (vous)";
+        }
+
+        // =====================
+        // CHAT ACTIF
+        // =====================
+        if (selectedUser && username === selectedUser) {
             div.style.fontWeight = "bold";
+            div.style.color = "#4f8cff";
         }
 
         div.onclick = () => {
+
+            // interdit de se sélectionner soi-même
+            if (username === currentUser) return;
+
             selectedUser = username;
-            history.pushState({}, "", `/chat?user=${username}`);
+
+            window.history.pushState(
+                {},
+                "",
+                `/chat?user=${username}`
+            );
+
             loadMessages();
+            loadUsers(); // refresh UI propre
         };
 
         sidebar.appendChild(div);
@@ -87,7 +121,9 @@ async function loadMessages() {
             const div = document.createElement("div");
             div.classList.add("msg");
 
-            if (m.from === currentUser) div.classList.add("me");
+            if (m.from === currentUser) {
+                div.classList.add("me");
+            }
 
             div.innerHTML = `
                 <div class="username">${m.from}</div>
@@ -104,13 +140,13 @@ async function loadMessages() {
 async function sendMessage() {
 
     const input = document.getElementById("msgInput");
-    const text = input.value;
+    const text = input.value.trim();
 
-    if (!text || !selectedUser || !currentUser) return;
+    if (!text || !selectedUser) return;
 
     await fetch("/send_message", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
             from: currentUser,
             to: selectedUser,
@@ -126,7 +162,6 @@ async function sendMessage() {
 // THEME
 // =====================
 function changeTheme() {
-
     const theme = document.getElementById("themeSelect").value;
     localStorage.setItem("theme", theme);
     document.body.className = theme;

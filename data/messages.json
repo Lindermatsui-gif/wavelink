@@ -13,5 +13,15 @@
         "from": "Leo",
         "to": "Yann",
         "text": "coucou"
+    },
+    {
+        "from": "Constant",
+        "to": "Leo",
+        "text": "test1"
+    },
+    {
+        "from": "Constant",
+        "to": "Leo",
+        "text": "yo"
     }
 ]
