@@ -11,6 +11,10 @@
 <div id="container">
 
     <!-- SIDEBAR USERS -->
+    <div class="par">
+        <button class="param" id="param">⚙</button>
+    </div>
+
     <div id="sidebar"></div>
 
     <!-- CHAT -->
@@ -22,13 +26,17 @@
         <!-- INPUT AREA -->
         <div id="inputArea">
 
+            <label for="fileInput" style="cursor:pointer;font-size:1.3em;" title="Joindre un fichier">+</label>
+            <input type="file" id="fileInput" style="display:none" onchange="stageFile(this.files[0])">
+
+            <div id="preview" style="display:none;align-items:center;gap:6px;">
+                <img id="previewImg" style="max-height:50px;border-radius:6px;">
+                <span id="previewName" style="font-size:0.85em;opacity:0.7;"></span>
+                <button onclick="clearStaged()">✕</button>
+            </div>
+
             <input id="msgInput" type="text" placeholder="Write a message...">
-
-            <input type="file" id="fileInput">
-
-            <button onclick="sendMessage()">Send</button>
-
-            <button onclick="handleFile()">📎 File</button>
+            <button onclick="sendAll()" class="send">Send</button>
 
         </div>
 

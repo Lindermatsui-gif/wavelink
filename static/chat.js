@@ -1,5 +1,6 @@
 let currentUser = null;
 let selectedUser = null;
+let stagedFile = null;
 
 // =====================
 // UPLOAD FILE
@@ -163,67 +164,97 @@ async function loadMessages() {
 }
 
 // =====================
-// SEND MESSAGE
+// STAGE FILE (aperçu sans envoyer)
 // =====================
-function sendMessage() {
-
-    const input = document.getElementById("msgInput");
-    const text = input.value.trim();
-
-    if (!text || !selectedUser) return;
-
-    fetch("/send_message", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            from: currentUser,
-            to: selectedUser,
-            type: "text",
-            text: text,
-            content: ""
-        })
-    });
-
-    input.value = "";
-    loadMessages();
-}
-
-// =====================
-// FILE MESSAGE
-// =====================
-async function handleFile() {
-
-    if (!selectedUser) return alert("Choisis un utilisateur");
-
-    const input = document.getElementById("fileInput");
-    const file = input.files[0];
+function stageFile(file) {
 
     if (!file) return;
 
-    const uploaded = await uploadFile(file);
+    stagedFile = file;
 
-    const ext = file.name.split(".").pop().toLowerCase();
+    const preview = document.getElementById("preview");
+    const img = document.getElementById("previewImg");
+    const name = document.getElementById("previewName");
 
-    let type = "file";
+    preview.style.display = "flex";
 
-    if (["png","jpg","jpeg","webp","svg"].includes(ext)) type = "image";
-    else if (ext === "gif") type = "gif";
-    else if (["mp4","webm","mov"].includes(ext)) type = "video";
+    if (file.type.startsWith("image")) {
+        img.src = URL.createObjectURL(file);
+        img.style.display = "inline";
+        name.textContent = "";
+    } else {
+        img.style.display = "none";
+        name.textContent = "📎 " + file.name;
+    }
+}
 
-    await fetch("/send_message", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            from: currentUser,
-            to: selectedUser,
-            type: type,
-            text: file.name,
-            content: uploaded.url
-        })
-    });
+function clearStaged() {
 
-    input.value = "";
-    loadMessages();
+    stagedFile = null;
+
+    document.getElementById("preview").style.display = "none";
+    document.getElementById("previewImg").src = "";
+    document.getElementById("previewName").textContent = "";
+    document.getElementById("fileInput").value = "";
+}
+
+// =====================
+// SEND ALL (texte + fichier)
+// =====================
+async function sendAll() {
+
+    if (!selectedUser) return alert("Choisis un utilisateur");
+
+    // Fichier stagé
+    if (stagedFile) {
+
+        const file = stagedFile;
+        clearStaged();
+
+        const uploaded = await uploadFile(file);
+        const ext = file.name.split(".").pop().toLowerCase();
+
+        let type = "file";
+        if (["png","jpg","jpeg","webp","svg"].includes(ext)) type = "image";
+        else if (ext === "gif") type = "gif";
+        else if (["mp4","webm","mov"].includes(ext)) type = "video";
+
+        await fetch("/send_message", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                from: currentUser,
+                to: selectedUser,
+                type: type,
+                text: file.name,
+                content: uploaded.url
+            })
+        });
+
+        loadMessages();
+    }
+
+    // Texte
+    const input = document.getElementById("msgInput");
+    const text = input.value.trim();
+
+    if (text) {
+
+        await fetch("/send_message", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                from: currentUser,
+                to: selectedUser,
+                type: "text",
+                text: text,
+                content: ""
+            })
+        });
+
+        input.value = "";
+        loadMessages();
+    }
 }
 
 // =====================
@@ -234,46 +265,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const input = document.getElementById("msgInput");
 
     input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-            sendMessage();
-        }
+        if (e.key === "Enter") sendAll();
     });
 });
 
 // =====================
-// PASTE IMAGE (CTRL + V)
+// CTRL+V → aperçu seulement
 // =====================
-document.addEventListener("paste", async (e) => {
+document.addEventListener("paste", (e) => {
 
     const items = e.clipboardData.items;
 
     for (let item of items) {
-
         if (item.type.startsWith("image")) {
-
             const file = item.getAsFile();
-
-            const uploaded = await uploadFile(file);
-
-            await fetch("/send_message", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    from: currentUser,
-                    to: selectedUser,
-                    type: "image",
-                    text: "image",
-                    content: uploaded.url
-                })
-            });
-
-            loadMessages();
+            stageFile(file);
         }
     }
 });
 
 // =====================
-// DRAG & DROP
+// DRAG & DROP → aperçu seulement
 // =====================
 const inputArea = document.getElementById("inputArea");
 
@@ -283,27 +295,9 @@ if (inputArea) {
         e.preventDefault();
     });
 
-    inputArea.addEventListener("drop", async (e) => {
-
+    inputArea.addEventListener("drop", (e) => {
         e.preventDefault();
-
         const file = e.dataTransfer.files[0];
-        if (!file) return;
-
-        const uploaded = await uploadFile(file);
-
-        await fetch("/send_message", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                from: currentUser,
-                to: selectedUser,
-                type: "image",
-                text: file.name,
-                content: uploaded.url
-            })
-        });
-
-        loadMessages();
+        if (file) stageFile(file);
     });
 }
